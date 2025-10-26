@@ -12,7 +12,7 @@ import requests
 ASI_API_KEY = os.getenv("ASI_ONE_API_KEY", "")
 ASI_ENDPOINT = "https://api.asi1.ai/v1/chat/completions"
 ASI_MODEL = "asi1-fast-agentic"
-ASI_TIMEOUT = 500
+ASI_TIMEOUT = 1000
 _SESSION_MAP: Dict[str, str] = {}
 
 def _asi_session_id(conv_id: str) -> str:
@@ -80,16 +80,22 @@ def asi_chat_json(conv_id: str, system_prompt: str, user_content_obj: Dict[str, 
     }
     try:
         resp = requests.post(ASI_ENDPOINT, headers=headers, json=payload, timeout=ASI_TIMEOUT)
-        print(resp)
+        if verbose:
+            print(f"[ASI status] {resp.status_code}", file=sys.stderr)
         resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
+        resp_json = resp.json()
+        content = resp_json["choices"][0]["message"]["content"]
         if verbose:
             print("[ASI raw]", content[:500], "..." if len(content) > 500 else "", file=sys.stderr)
+        if not content or not content.strip():
+            raise ValueError("ASI returned empty content")
         return _extract_first_json(content)
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"ASI HTTP error: {e}") from e
     except (KeyError, IndexError) as e:
         raise RuntimeError(f"ASI response shape unexpected: {resp.text[:400]}") from e
+    except ValueError as e:
+        raise RuntimeError(f"ASI parsing error: {e}. Content: {content[:200] if 'content' in locals() else 'N/A'}") from e
     except Exception as e:
         raise RuntimeError(f"ASI parsing error: {e}") from e
 
@@ -147,6 +153,7 @@ ASI_FACTOR_SYSTEM = """You are an expert carbon accounting analyst. Return ONLY 
 Fields: kg_per_kwh (number), source_name, source_url, version, region_key, t_and_d_loss_fraction (number or null), citations (array of 1-4 URLs).
 Pick authoritative electricity grid factor for the given country, state/region, year, and standard.
 If state/region is US, use appropriate eGRID region and include T&D loss if available.
+NEVER MISS kg_per_kwh
 """
 
 ASI_INFER_LOCALE_SYSTEM = """You are an expert data profiler. Return ONLY JSON.
@@ -173,8 +180,18 @@ def resolve_factor_via_asi(cfg: ReportingConfig, *, verbose=False) -> FactorResu
     }
     try:
         data = asi_chat_json(conv_id, ASI_FACTOR_SYSTEM, user_payload, verbose=verbose)
+        
+        # Validate required fields
+        kg_per_kwh_value = data.get("kg_per_kwh")
+        if kg_per_kwh_value is None:
+            raise ValueError("ASI returned null or missing kg_per_kwh")
+        if not data.get("source_name"):
+            raise ValueError("ASI returned null or missing source_name")
+        if not data.get("source_url"):
+            raise ValueError("ASI returned null or missing source_url")
+        
         return FactorResult(
-            kg_per_kwh=float(data["kg_per_kwh"]),
+            kg_per_kwh=float(kg_per_kwh_value),
             source_name=str(data["source_name"]),
             source_url=str(data["source_url"]),
             version=str(data.get("version","")),
