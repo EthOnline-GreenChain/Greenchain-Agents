@@ -15,7 +15,7 @@ Combines:
 """
 
 from __future__ import annotations
-import io, os, json, uvicorn, hashlib, pandas as pd, asyncio, time as time_module
+import io, os, json, uvicorn, hashlib, pandas as pd, asyncio, time as time_module, requests
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, Form, Query, BackgroundTasks, Body
@@ -161,16 +161,69 @@ class ProcurementOrchestrator:
                 "payment": "pending",
                 "retirement": "pending",
                 "proof_generation": "pending"
-            },
-            "note": "Full agent workflow requires Bureau to run in separate process"
+            }
         }
         
         print(f"[Procurement] Created request {request_id} for {intent.tco2e} tCO2e")
         
-        # TODO: In production, send message to curator agent via uagents messaging
-        # This requires Bureau to be running in a separate process
+        # Send to Bureau if it's running
+        bureau_success = self._send_to_bureau(request_id, intent)
+        if bureau_success:
+            self.procurement_requests[request_id]["stages"]["provider_query"] = "in_progress"
         
         return request_id
+    
+    def _send_to_bureau(self, request_id: str, intent: FootprintIntent) -> bool:
+        """Send procurement request to Bureau agent network"""
+        try:
+            # Bureau endpoint
+            bureau_url = f"http://localhost:{BUREAU_PORT}/submit"
+            
+            # Get curator address from stored agents
+            if not self.agents or 'curator' not in self.agents:
+                print(f"[Procurement] ⚠️  Bureau not initialized, cannot send request")
+                print(f"[Procurement]   Request {request_id} tracked but not sent to agents")
+                return False
+            
+            curator_addr = self.agents['curator'].address
+            
+            # Prepare message for Bureau
+            # This sends directly to the curator agent
+            payload = {
+                "sender": "api_server",
+                "target": curator_addr,
+                "protocol": "footprint_intent",
+                "message": {
+                    "request_id": request_id,
+                    **intent.__dict__
+                }
+            }
+            
+            print(f"[Procurement] → Sending request to Bureau at {bureau_url}")
+            print(f"[Procurement]   Target: curator {curator_addr[:20]}...")
+            
+            # Send to Bureau with timeout
+            response = requests.post(bureau_url, json=payload, timeout=2)
+            
+            if response.status_code == 200:
+                print(f"[Procurement] ✓ Bureau accepted request {request_id}")
+                return True
+            else:
+                print(f"[Procurement] ✗ Bureau returned status {response.status_code}")
+                print(f"[Procurement]   Response: {response.text[:200]}")
+                return False
+                
+        except requests.exceptions.ConnectionError:
+            print(f"[Procurement] ⚠️  Bureau not reachable at port {BUREAU_PORT}")
+            print(f"[Procurement]   Request {request_id} tracked but not sent to agents")
+            print(f"[Procurement]   Start Bureau with: python bureau_runner_fixed.py")
+            return False
+        except requests.exceptions.Timeout:
+            print(f"[Procurement] ⚠️  Bureau connection timeout")
+            return False
+        except Exception as e:
+            print(f"[Procurement] ⚠️  Failed to send to Bureau: {e}")
+            return False
     
     def get_request_status(self, request_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a procurement request"""
@@ -624,6 +677,11 @@ async def trigger_procurement(
     """
     Trigger carbon credit procurement for calculated emissions
     
+    This endpoint:
+    1. Creates a procurement request
+    2. Sends it to Bureau agent network (if running)
+    3. Returns request_id for status tracking
+    
     Parameters:
     - file_id: ID from CO2 calculation
     - policy_name: Procurement policy
@@ -677,16 +735,21 @@ async def trigger_procurement(
     # Trigger procurement and get request_id
     request_id = procurement.trigger_procurement(file_id, intent)
     
+    # Get updated status (may show Bureau connection status)
+    status = procurement.get_request_status(request_id)
+    
     return {
         "status": "procurement_triggered",
-        "request_id": request_id,  # NEW: Return request_id
+        "request_id": request_id,
         "intent": intent.__dict__,
         "file_id": file_id,
         "bureau_endpoint": f"http://0.0.0.0:{BUREAU_PORT}/submit",
-        "message": "Procurement request submitted to agent network",
+        "bureau_status": "sent" if status.get("stages", {}).get("provider_query") == "in_progress" else "bureau_not_running",
+        "message": "Procurement request created and sent to Bureau (if running)",
         "next_steps": {
             "check_status": f"/procurement/status/{request_id}",
-            "list_all": f"/procurement/requests?file_id={file_id}"
+            "list_all": f"/procurement/requests?file_id={file_id}",
+            "start_bureau": "python bureau_runner.py (if not running)"
         }
     }
 
