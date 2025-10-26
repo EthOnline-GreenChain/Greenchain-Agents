@@ -1,0 +1,43 @@
+{
+    "schema_version": "greenchain.ingest.v1",
+    "run_id": "1058991d-44fd-4b00-bd1c-ffd3a5c1770b",
+    "started_at": "2025-10-25T13:09:26.628898",
+    "finished_at": "2025-10-25T13:09:26.630927",
+    "source": {
+        "source_type": "pdf",
+        "filename": "demo_electricity_bill.pdf",
+        "sha256": "93aef3e9ab898f8cd02040aa938383851410b9b669fb4d39923ce2459f333f5f",
+        "received_at": "2025-10-25T13:09:26.628898",
+        "extra": {}
+    },
+    "billing_statements": [
+        {
+            "statement_id": "0c132e55-5261-492b-b4c0-3005a65478c6",
+            "account_id": null,
+            "service_point_id": null,
+            "billing_period_start": "2022-06-30",
+            "billing_period_end": "2022-07-29",
+            "statement_date": "2022-07-30",
+            "subtotal": null,
+            "tax": null,
+            "total": 1860.38,
+            "currency": "INR",
+            "rate_plan": null,
+            "lines": []
+        }
+    ],
+    "interval_readings": [
+        {
+            "reading_id": "a9f31bc7-58cc-4afd-9f2a-dcc9a53be72b",
+            "meter_id": null,
+            "ts_start_utc": "2022-06-30T00:00:00Z",
+            "ts_end_utc": "2022-07-29T23:59:59Z",
+            "kwh": 385.0,
+            "kw_demand": null,
+            "quality": "U",
+            "source": "pdf",
+            "ingestion_run_id": null
+        }
+    ],
+    "gcp_footprint": null
+}
