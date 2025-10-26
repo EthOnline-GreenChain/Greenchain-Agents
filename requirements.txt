@@ -1,0 +1,17 @@
+
+fastapi==0.115.2
+uvicorn[standard]==0.30.6
+
+pydantic==2.9.2
+requests==2.32.3
+
+# PDF / Excel
+langchain-community==0.3.4
+pypdf==5.0.1
+pandas==2.2.3
+openpyxl==3.1.5
+
+# Gmail
+google-api-python-client==2.146.0
+google-auth==2.35.0
+google-auth-oauthlib==1.2.1
