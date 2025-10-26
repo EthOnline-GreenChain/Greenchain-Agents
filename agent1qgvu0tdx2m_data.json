@@ -1,0 +1,12 @@
+{
+    "providers": [
+        "agent1qdujjdunu68a9vc8fx6m5gxr0mtwhkxurpjc0sdpqu3fzttg3lds5572c3d",
+        "agent1qds4dd09w6kq27mpldew0eukzrz0qxxt2y3q5v8synw5kk4873q9sx2lfcm"
+    ],
+    "payment_addr": "agent1q2zyywkhcdf92arde4t8xln7tutzquu7crcww0vrs28dthjypvhcvn2qtfu",
+    "retire_addr": "agent1qtvf4xyte2aqf3wjagm5ayn859rh03kvr7733z76z3c488rx4lw0qjyuh0x",
+    "bundler_addr": "agent1qvgtdnmc5z3ewy7whaj0gyrhxgvgfxvdg2pzkw9dufzx2vcyg2l3u79th07",
+    "policy": {},
+    "last_trade": null,
+    "buyer_wallet": "agent1qgvu0tdx2mpr0vtsgjtp29968sptgz292wyt97w027t06yczwany6f0epau"
+}
