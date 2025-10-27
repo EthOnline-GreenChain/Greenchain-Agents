@@ -46,12 +46,12 @@ from co2_engine import (
 # Procurement imports
 from uagents import Bureau, Agent
 from uagents_core.envelope import Envelope as MsgEnvelope
-from procurement.basket_curator_1 import build_agent as build_curator, FootprintIntent, FOOTPRINT_PROTOCOL_DIGEST, FOOTPRINT_SCHEMA_DIGEST, INTENT_PROTOCOL
-from procurement.provider_adaptor_in import build_agent as build_provider_in
-from procurement.provider_adaptor_np import build_agent as build_provider_np
-from procurement.payment_orchestrator import build_agent as build_payment
-from procurement.retirement_registrar import build_agent as build_retire
-from procurement.proof_bundler import build_agent as build_bundler
+from .procurement.basket_curator_1 import build_agent as build_curator, FootprintIntent, FOOTPRINT_PROTOCOL_DIGEST, FOOTPRINT_SCHEMA_DIGEST, INTENT_PROTOCOL
+from .procurement.provider_adaptor_in import build_agent as build_provider_in
+from .procurement.provider_adaptor_np import build_agent as build_provider_np
+from .procurement.payment_orchestrator import build_agent as build_payment
+from .procurement.retirement_registrar import build_agent as build_retire
+from .procurement.proof_bundler import build_agent as build_bundler
 
 
 # Import envelope coercion utilities
