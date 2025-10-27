@@ -1,64 +1,67 @@
 #!/usr/bin/env python3
-# Enable postponed annotations
-from __future__ import annotations
 """
 GreenChain Comprehensive Integrated Runner
 ===========================================
-Complete platform combining:
-1. FastAPI ingestion endpoints (PDF, Excel, GCP)
-2. CO2 calculation engine (Scope 2/3 emissions)
-3. Procurement orchestration (uAgents Bureau for carbon credits)
-4. Full pipeline: ingest → calculate → procure
-
-Key Features:
-- Multiple ingestion methods (PDF, Excel/CSV, GCP metadata)
-- Comprehensive CO2 calculation with location/market-based methods
-- Carbon credit procurement with agent network
-- Request tracking and status monitoring
-- Complete API with Swagger documentation
-
-Author: GreenChain Team
-Version: 2.0.0
+Complete platform combining ingestion, CO2 engine, and procurement uAgents.
 """
-from __future__ import annotations
-# Ensure `procurement` is on the import path
-import sys
+
+
+
+# Initialize working directory and PYTHONPATH so local packages are discoverable
+import os, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+BASE_DIR = Path(__file__).resolve().parent
+os.chdir(BASE_DIR)
+sys.path.insert(0, str(BASE_DIR))
 
-from __future__ import annotations
-import io, os, json, uvicorn, hashlib, pandas as pd, time as time_module, requests
-import uuid, base64, json, time as time_module
+# Standard library
+import io
+import json
+import uuid
+import base64
+import hashlib
+import time as time_module
+import requests
 
+# Third-party
+import pandas as pd
+import uvicorn
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, Query, Body
 from fastapi.responses import JSONResponse, FileResponse
-from pathlib import Path
 
-# Ingestion imports
+# Ingestion
 from greenchain.schema import Envelope, SourceInfo, BillingStatement, IntervalReading, envelope_json_schema_for_asi
 from greenchain.pdf_text import extract_text_from_pdf
 from greenchain.asi_client import ASIClient
 
-# CO2 engine imports
+# CO2 engine
 from co2_engine import (
-    ReportingConfig, 
-    resolve_factor_via_asi, 
+    ReportingConfig,
+    resolve_factor_via_asi,
     compute_scope2_and_tandd,
     infer_country_state_via_asi,
     infer_country_state_heuristic,
 )
 
-# Procurement imports
+# Messaging
 from uagents import Bureau, Agent
 from uagents_core.envelope import Envelope as MsgEnvelope
-from procurement.basket_curator_1 import build_agent as build_curator, FootprintIntent, FOOTPRINT_PROTOCOL_DIGEST, FOOTPRINT_SCHEMA_DIGEST, INTENT_PROTOCOL
-from procurement.provider_adaptor_in import build_agent as build_provider_in
-from procurement.provider_adaptor_np import build_agent as build_provider_np
-from procurement.payment_orchestrator import build_agent as build_payment
-from procurement.retirement_registrar import build_agent as build_retire
-from procurement.proof_bundler import build_agent as build_bundler
+
+# Procurement orchestration (from procurement package)
+from procurement import (
+    build_curator,
+    build_provider_in,
+    build_provider_np,
+    build_payment,
+    build_retire,
+    build_bundler,
+    FootprintIntent,
+    FOOTPRINT_PROTOCOL_DIGEST,
+    FOOTPRINT_SCHEMA_DIGEST,
+    INTENT_PROTOCOL,
+)
 
 
 # Import envelope coercion utilities
