@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Enable postponed annotations
+from __future__ import annotations
 """
 GreenChain Comprehensive Integrated Runner
 ===========================================
@@ -18,6 +20,11 @@ Key Features:
 Author: GreenChain Team
 Version: 2.0.0
 """
+from __future__ import annotations
+# Ensure `procurement` is on the import path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
 
 from __future__ import annotations
 import io, os, json, uvicorn, hashlib, pandas as pd, time as time_module, requests
@@ -46,12 +53,12 @@ from co2_engine import (
 # Procurement imports
 from uagents import Bureau, Agent
 from uagents_core.envelope import Envelope as MsgEnvelope
-from .procurement.basket_curator_1 import build_agent as build_curator, FootprintIntent, FOOTPRINT_PROTOCOL_DIGEST, FOOTPRINT_SCHEMA_DIGEST, INTENT_PROTOCOL
-from .procurement.provider_adaptor_in import build_agent as build_provider_in
-from .procurement.provider_adaptor_np import build_agent as build_provider_np
-from .procurement.payment_orchestrator import build_agent as build_payment
-from .procurement.retirement_registrar import build_agent as build_retire
-from .procurement.proof_bundler import build_agent as build_bundler
+from procurement.basket_curator_1 import build_agent as build_curator, FootprintIntent, FOOTPRINT_PROTOCOL_DIGEST, FOOTPRINT_SCHEMA_DIGEST, INTENT_PROTOCOL
+from procurement.provider_adaptor_in import build_agent as build_provider_in
+from procurement.provider_adaptor_np import build_agent as build_provider_np
+from procurement.payment_orchestrator import build_agent as build_payment
+from procurement.retirement_registrar import build_agent as build_retire
+from procurement.proof_bundler import build_agent as build_bundler
 
 
 # Import envelope coercion utilities
