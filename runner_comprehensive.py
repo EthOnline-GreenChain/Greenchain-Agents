@@ -5,8 +5,6 @@ GreenChain Comprehensive Integrated Runner
 Complete platform combining ingestion, CO2 engine, and procurement uAgents.
 """
 
-
-
 # Initialize working directory and PYTHONPATH so local packages are discoverable
 import os, sys
 from pathlib import Path
@@ -231,52 +229,71 @@ class ProcurementOrchestrator:
     
 
     def _send_to_bureau(self, request_id: str, intent: FootprintIntent) -> bool:
-        """Send procurement request to Bureau agent network"""
+        """Send procurement request to Bureau agent network.
+
+        Behavior:
+        - If BUREAU_URL env var is set, use it (recommended for Render deployments).
+        - Otherwise fall back to http://localhost:{BUREAU_PORT}/submit for same-container setups.
+        - If agents/curator exist locally, build & sign a MsgEnvelope (preferred).
+        - If no agents available, POST a plain JSON fallback payload (unsigned) and warn.
+        """
         try:
-            bureau_url = f"http://localhost:{BUREAU_PORT}/submit"
+            import os
+            from urllib.parse import urljoin
 
-            # Curator must be running inside this Bureau
-            if not self.agents or "curator" not in self.agents:
-                print("[Procurement] ⚠️  Bureau not initialized, cannot send request")
-                return False
+            base = os.getenv("BUREAU_URL", f"http://localhost:{BUREAU_PORT}")
+            # ensure we end up with .../submit
+            if base.rstrip("/").endswith("/submit"):
+                bureau_url = base
+            else:
+                bureau_url = urljoin(base.rstrip("/") + "/", "submit")
 
-            curator_addr = self.agents["curator"].address
-
-            # Use a REAL local agent for both sender AND signing (payment is fine)
-            sender_agent = self.agents.get("payment", self.agents["curator"])
-            sender_addr  = sender_agent.address
-
-            # Resolve FootprintIntent schema digest from the protocol registry
-            schema_digest = next(
-                (d for d, model in INTENT_PROTOCOL.models.items() if model is FootprintIntent),
-                None
-            )
-            if not schema_digest:
-                print("[Procurement] ⚠️  FootprintIntent schema digest not found")
-                return False
-
-            # Payload delivered to the curator handler (you can include request_id for tracing)
+            # Payload delivered to curator handler (include request_id for tracing)
             payload_obj = {"request_id": request_id, **intent.__dict__}
 
-            # Build the Exchange-Protocol envelope (note: no 'source' here)
-            env = MsgEnvelope(
-                version=1,
-                sender=sender_addr,
-                target=curator_addr,
-                session=str(uuid.uuid4()),
-                schema_digest=schema_digest,
-                protocol_digest=FOOTPRINT_PROTOCOL_DIGEST,  # e.g. "proto:<64hex>"
-            )
-            # Base64 payload encoding handled internally
-            env.encode_payload(json.dumps(payload_obj))
+            # If agents are present and curator exists, build & sign envelope
+            if self.agents and "curator" in self.agents:
+                curator_addr = self.agents["curator"].address
+                sender_agent = self.agents.get("payment", self.agents["curator"])
+                sender_addr = sender_agent.address
 
-            # Sign with the SAME agent as 'sender'
-            env.sign(sender_agent)
+                # Resolve FootprintIntent schema digest from the protocol registry
+                schema_digest = next(
+                    (d for d, model in INTENT_PROTOCOL.models.items() if model is FootprintIntent),
+                    None
+                )
+                if not schema_digest:
+                    print("[Procurement] ⚠️  FootprintIntent schema digest not found")
+                    return False
 
-            print(f"[Procurement] → Sending request to Bureau at {bureau_url}")
-            resp = requests.post(bureau_url, json=env.model_dump(mode="json"), timeout=5.0)
+                # Build the Exchange-Protocol envelope
+                env = MsgEnvelope(
+                    version=1,
+                    sender=sender_addr,
+                    target=curator_addr,
+                    session=str(uuid.uuid4()),
+                    schema_digest=schema_digest,
+                    protocol_digest=FOOTPRINT_PROTOCOL_DIGEST,
+                )
+                env.encode_payload(json.dumps(payload_obj))
 
-            if resp.status_code == 200:
+                # Sign with the SAME agent as 'sender'
+                env.sign(sender_agent)
+
+                body = env.model_dump(mode="json")
+                headers = {"Content-Type": "application/json"}
+                print(f"[Procurement] → Sending signed request to Bureau at {bureau_url}")
+
+            else:
+                # No local agents/curator — try sending unsigned JSON (fallback)
+                print("[Procurement] ⚠️  Local agents/curator not available — sending unsigned fallback payload")
+                body = payload_obj
+                headers = {"Content-Type": "application/json"}
+
+            # Send the request
+            resp = requests.post(bureau_url, json=body, headers=headers, timeout=10.0)
+
+            if 200 <= resp.status_code < 300:
                 print("[Procurement] ✓ Request sent successfully")
                 return True
 
@@ -284,7 +301,7 @@ class ProcurementOrchestrator:
             return False
 
         except requests.exceptions.ConnectionError:
-            print(f"[Procurement] ⚠️  Cannot connect to Bureau on port {BUREAU_PORT}")
+            print(f"[Procurement] ⚠️  Cannot connect to Bureau at {bureau_url}")
             return False
         except requests.exceptions.Timeout:
             print("[Procurement] ⚠️  Bureau connection timeout")
@@ -292,6 +309,7 @@ class ProcurementOrchestrator:
         except Exception as e:
             print(f"[Procurement] ⚠️  Failed to send to Bureau: {e}")
             return False
+
 
 
     
